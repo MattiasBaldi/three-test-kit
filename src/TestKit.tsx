@@ -10,13 +10,11 @@ const queryClient = new QueryClient()
 
 
 // 3D Scene Component - renders inside Canvas
-export default function TestKit({}) 
+export default function TestKit() 
 {
     const [env, setEnv] = useState(null)
     const [texture, setTexture] = useState([])
     const [model, setModel] = useState(null)
-
-
 
     return (
         <>
