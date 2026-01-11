@@ -1,5 +1,5 @@
 import { Canvas } from '@react-three/fiber'
-import TestKit, { Kit } from './TestKit'
+import TestKit from './TestKit'
 
 export default function App() {
 

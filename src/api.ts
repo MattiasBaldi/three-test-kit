@@ -10,7 +10,16 @@ const BASE_URL = 'https://api.polyhaven.com';
 
 // ============= Types =============
 
-export type AssetType = 'hdris' | 'textures' | 'models' | 'all';
+export const ASSET_TYPES = {
+  HDRIS: 'hdris',
+  TEXTURES: 'textures',
+  MODELS: 'models',
+  ALL: 'all',
+} as const;
+
+export type AssetType = (typeof ASSET_TYPES)[keyof typeof ASSET_TYPES];
+
+
 
 export interface AssetMetadata {
   id: string;
@@ -306,3 +315,60 @@ export async function example5_SearchByTag(searchTag: string) {
 // ============= Export default instance =============
 
 export default new PolyhavenAPI('three-test-kit');
+
+/**
+ * Poly Haven API – Endpoints
+ *
+ * Base URL: https://api.polyhaven.com
+ */
+
+/**
+ * 1. GET /types
+ * Returns available asset types.
+ * Values: hdris, textures, models
+ */
+
+/**
+ * 2. GET /assets
+ * Returns a list of assets with basic metadata.
+ *
+ * Query params:
+ * - type: hdris | textures | models | all
+ * - categories: comma-separated list (must match all)
+ */
+
+/**
+ * 3. GET /info/{id}
+ * Returns full metadata for a single asset.
+ *
+ * Path param:
+ * - id: asset slug
+ */
+
+/**
+ * 4. GET /files/{id}
+ * Returns all downloadable files for an asset,
+ * grouped by resolution and file type.
+ *
+ * Path param:
+ * - id: asset slug
+ */
+
+/**
+ * 5. GET /author/{id}
+ * Returns information about an asset author.
+ *
+ * Path param:
+ * - id: author ID
+ */
+
+/**
+ * 6. GET /categories/{type}
+ * Returns categories and asset counts for a given type.
+ *
+ * Path param:
+ * - type: hdris | textures | models
+ *
+ * Query param:
+ * - in: comma-separated category filter
+ */
