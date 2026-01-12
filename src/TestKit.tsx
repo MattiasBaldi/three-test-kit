@@ -1,7 +1,10 @@
-import { Html, OrbitControls, Environment, useGLTF } from '@react-three/drei'
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Html, OrbitControls, Environment } from '@react-three/drei'
+import { Suspense, useMemo, useState } from 'react'
+import { LoadingManager } from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { useLoader } from '@react-three/fiber'
 import { createPortal } from 'react-dom'
-import { useAllAssets, useAssets } from './useQueries'
+import { useAllAssets } from './useQueries'
 import api, {ASSET_TYPES, type AssetType} from './api'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
 
@@ -14,7 +17,7 @@ export default function TestKit()
 {
     const [env, setEnv] = useState(null)
     const [texture, setTexture] = useState([])
-    const [model, setModel] = useState(null)
+    const [model, setModel] = useState<{url: string, includes: Record<string, {url: string}>} | null>(null)
 
     return (
         <>
@@ -23,7 +26,7 @@ export default function TestKit()
       {/* Models */}
         {model &&
           <Suspense>
-            <Model url={model}/>
+            <Model url={model.url} includes={model.includes}/>
           </Suspense>
         }
 
@@ -47,34 +50,48 @@ export default function TestKit()
     )
 }
 
-function Model({ url }: { url: string }) {
-  const {scene} = useGLTF(url, true, true, (loader) => {
-    console.log({loader, url})
+function Model({ url, includes }: { url: string, includes: Record<string, {url: string}> }) {
+  // Create a custom LoadingManager that rewrites texture URLs
+  const manager = useMemo(() => {
+    const mgr = new LoadingManager()
+    mgr.setURLModifier((resourceUrl) => {
+      // Extract the filename from the URL
+      const filename = resourceUrl.split('/').pop()
 
-    //loader.resourcePath = "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k"
+      // Look for a matching resource in includes
+      for (const [key, value] of Object.entries(includes)) {
+        if (key.endsWith(filename!)) {
+          console.log(`Remapping ${resourceUrl} -> ${value.url}`)
+          return value.url
+        }
+      }
+      return resourceUrl
+    })
+    return mgr
+  }, [includes])
 
-    loader.setCrossOrigin("https://dl.polyhaven.org")
-    // loader.resourcePath = "https://dl.polyhaven.org/file/ph-assets/Models/gltf"
-    // This needs to be extended to account for the fact that the ressources does not come as .glb and base roots differ from textures to bin/gltf
-
+  const gltf = useLoader(GLTFLoader, url, (loader) => {
+    loader.manager = manager
   })
-  return <primitive object={scene} />
+
+  return <primitive object={gltf.scene} />
 }
 
 function Env({ HDRI }: { HDRI: string }) {
-    return <Environment files={HDRI} />
+    return <Environment files={HDRI} background/>
 }
 
 // UI Component (thumbnails) - renders outside Canvas
 export function Ui({props}) {
-    const [type, setType] = useState<AssetType>('models')
+
+    const [settings, setSettings] = useState()
+    const [type, setType] = useState<AssetType>('hdris')
     const [searchQuery, setSearchQuery] = useState<string | null>(null)
 
     // init fetch all
     const assets = useAllAssets()
 
     return createPortal(
-
       <div className="fixed z-100 top-0 left-0 p-4 flex flex-col bg-gray-200"
       style={{
         overflow: 'scroll',
@@ -88,12 +105,9 @@ export function Ui({props}) {
     {Object.values(ASSET_TYPES).map((asset) => (<Tab key={asset} text={asset} active={type === asset} onClick={() => setType(asset)} />))}
 
     </div>
-
-        {/* Search */}
         <Search searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
-        <Marquee searchQuery={searchQuery} assets={assets[type]} props={props} />
-              
-        </div>,
+        <Marquee searchQuery={searchQuery} assets={assets[type]} props={props} />              
+    </div>,
         document.body
     )
 }
@@ -170,10 +184,10 @@ function Marquee({ assets, props, searchQuery }: MarqueeProps) {
                 props.setEnv(d.url);
                 break;
               case 'texture':
-                props.setTexture((prev) => [...prev, d.url]);
+                props.setTexture((prev: string[]) => [...prev, d.url]);
                 break;
               case 'model':
-                props.setModel(d.url);
+                props.setModel({url: d.url, includes: d.includes || {}});
                 break;
             }
           }}
@@ -182,7 +196,6 @@ function Marquee({ assets, props, searchQuery }: MarqueeProps) {
     </div>
   );
 }
-
 
 // Search
 interface SearchProps {
@@ -206,10 +219,9 @@ function Search({searchQuery, setSearchQuery}: SearchProps) {
 
 }
 
-
-// Search
-const loadAsset = async (id, typeNum) => {
-  let url, type;
+// Load asset and return URL + includes for models
+const loadAsset = async (id: string, typeNum: number) => {
+  let url, type, includes;
   const r = await api.getFiles(id);
 
   console.log({id, typeNum, r})
@@ -231,14 +243,14 @@ const loadAsset = async (id, typeNum) => {
       // load model
       type = "model"
       url = r?.gltf?.["1k"]?.gltf?.url;
+      includes = r?.gltf?.["1k"]?.gltf?.include;
       break;
 
     default:
       url = undefined;
-
   }
 
-  return {url, type};
+  return {url, type, includes};
 };
 
 
