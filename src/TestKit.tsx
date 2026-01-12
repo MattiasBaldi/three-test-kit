@@ -50,9 +50,14 @@ export default function TestKit()
 }
 
 function Model({ url }: { url: string }) {
-    const { scene } = useGLTF(url)
-    console.log(scene)
-    return <primitive object={scene} />
+  const {scene} = useGLTF(url, true, true, (loader) => {
+    console.log({loader, url})
+
+    // loader.resourcePath = "https://dl.polyhaven.org/file/ph-assets/Models/gltf"
+    // This needs to be extended to account for the fact that the ressources does not come as .glb and base roots differ from textures to bin/gltf
+
+  })
+  return <primitive object={scene} />
 }
 
 function Env({ HDRI }: { HDRI: string }) {
@@ -85,17 +90,12 @@ export function Ui({props}) {
 
         {/* Search */}
         <Search searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
-
         <Marquee searchQuery={searchQuery} assets={assets[type]} props={props} />
               
         </div>,
         document.body
     )
 }
-
-
-
-
 
 interface TabProps {
   onClick: () => void;
@@ -118,7 +118,7 @@ function Tab({ onClick, text, active }: TabProps) {
   );
 }
 
-/// Mar
+/// Marquee
 interface MarqueeProps {
   assets: {
     data: any;
@@ -135,7 +135,6 @@ function Marquee({ assets, props, searchQuery }: MarqueeProps) {
     if (assets.isLoading || !assets.data) return null; 
     
     let entries = Object.entries(assets.data);
-
 
     // searching 
     if (searchQuery) {
@@ -190,7 +189,6 @@ interface SearchProps {
   setSearchQuery: (value: string) => void;
 }
 
-
 function Search({searchQuery, setSearchQuery}: SearchProps) {
 
   return (<form className='w-full'>
@@ -207,6 +205,8 @@ function Search({searchQuery, setSearchQuery}: SearchProps) {
 
 }
 
+
+// Search
 const loadAsset = async (id, typeNum) => {
   let url, type;
   const r = await api.getFiles(id);
@@ -234,6 +234,7 @@ const loadAsset = async (id, typeNum) => {
 
     default:
       url = undefined;
+
   }
 
   return {url, type};
