@@ -37,8 +37,6 @@ export default function TestKit()
 
          {/* Textures */}
 
-
-
           {/* Ui */}
             <Html>
               <QueryClientProvider client={queryClient}>
@@ -53,6 +51,9 @@ function Model({ url }: { url: string }) {
   const {scene} = useGLTF(url, true, true, (loader) => {
     console.log({loader, url})
 
+    //loader.resourcePath = "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k"
+
+    loader.setCrossOrigin("https://dl.polyhaven.org")
     // loader.resourcePath = "https://dl.polyhaven.org/file/ph-assets/Models/gltf"
     // This needs to be extended to account for the fact that the ressources does not come as .glb and base roots differ from textures to bin/gltf
 
