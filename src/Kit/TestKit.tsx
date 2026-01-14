@@ -1,6 +1,6 @@
-import { Html, Center, useEnvironment } from '@react-three/drei'
+import { Html, Center, useEnvironment, useCursor } from '@react-three/drei'
 import { Suspense, useState, useMemo, useEffect } from 'react'
-import { LoadingManager } from 'three'
+import { LoadingManager, Mesh, Raycaster, Vector2 } from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { useLoader, useThree } from '@react-three/fiber'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
@@ -46,11 +46,11 @@ export default function TestKit()
         }
 
         {/* Textures */}
-         {texture &&
+         {/* {texture && */}
           <Suspense>
-            <Tex />
+            <Tex data={texture}/>
           </Suspense>
-         }
+         {/* } */}
 
           {/* Ui */}
             <Html>
@@ -88,12 +88,106 @@ function Env({ data }: { data: AssetData }) {
   return null; 
 }
 
-function Tex() {
-  return null
+function Tex({data}: {data: AssetData}) {
 
-  // *
-  // Custom logic 
-  // *
+  const { camera, scene } = useThree()
+  const [pointer, setPointer] = useState<Vector2>()
+  const [selected, setSelected] = useState<Mesh | null>(null)
+  const [isHovering, setIsHovering] = useState<boolean>(false)
+
+  //   /** Custom logic
+  //    * Pick mesh' in the scene and allow them to be clicked / selected
+  //    * When selected it should be possible to add textures to that element
+  //    * When selected it gets outlined (the mesh)
+  //    * New mesh' added to the scene should have this affect too
+  //    */ 
+
+  //   // Set up a raytracer
+  //   // Set eventListener that changes to cursor pointer whenever a mesh is selected
+  useEffect(() => {
+    const raycaster = new Raycaster()
+
+    function onPointerMove(e: PointerEvent) {
+      const x = (e.clientX / window.innerWidth) * 2 - 1
+      const y = -(e.clientY / window.innerHeight) * 2 + 1
+      const newPointer = new Vector2(x, y)
+      setPointer(newPointer)
+
+      raycaster.setFromCamera(newPointer, camera)
+
+      // Optional: detect intersections immediately
+      const intersects = raycaster.intersectObjects(scene.children, true)
+      
+      
+      // Hit
+      if (intersects.length > 0) 
+      {
+        if (intersects[0].object && intersects[0].object?.isMesh)
+          {
+            setSelected(intersects[0]?.object)
+            setIsHovering(true)
+            console.log(intersects[0].object)
+          }
+      }
+      // No hit
+      else 
+      {
+        setIsHovering(false)
+      }
+    }
+
+
+    function onPointerDown(e: PointerEvent) {
+      if (!isHovering) return 
+      // set it as selected
+
+      // setSelected()
+    }
+
+    // listener
+    window.addEventListener('pointermove', onPointerMove)
+    return () => window.removeEventListener('pointermove', onPointerMove)
+    
+  }, [camera, scene])
+
+  // hover effect
+  useEffect(() => {
+    if (isHovering) document.body.style.cursor = "pointer"
+    if (!isHovering) document.body.style.cursor = "auto"
+  }, [isHovering])
+
+  // Set edges to indicate its selected
+// export const Edges: ForwardRefComponent<EdgesProps, EdgesRef> = /* @__PURE__ */ React.forwardRef<EdgesRef, EdgesProps>(
+//   ({ threshold = 15, geometry: explicitGeometry, ...props }: EdgesProps, fref) => {
+//     const ref = React.useRef<LineSegments2>(null!)
+//     React.useImperativeHandle(fref, () => ref.current, [])
+
+//     const tmpPoints = React.useMemo(() => [0, 0, 0, 1, 0, 0], [])
+//     const memoizedGeometry = React.useRef<THREE.BufferGeometry>(null)
+//     const memoizedThreshold = React.useRef<number>(null)
+
+//     React.useLayoutEffect(() => {
+//       const parent = ref.current.parent as THREE.Mesh
+//       const geometry = explicitGeometry ?? parent?.geometry
+//       if (!geometry) return
+
+//       const cached = memoizedGeometry.current === geometry && memoizedThreshold.current === threshold
+//       if (cached) return
+//       memoizedGeometry.current = geometry
+//       memoizedThreshold.current = threshold
+
+//       const points = (new THREE.EdgesGeometry(geometry, threshold).attributes.position as THREE.BufferAttribute)
+//         .array as Float32Array
+//       ref.current.geometry.setPositions(points)
+//       ref.current.geometry.attributes.instanceStart.needsUpdate = true
+//       ref.current.geometry.attributes.instanceEnd.needsUpdate = true
+//       ref.current.computeLineDistances()
+//     })
+
+//     return <Line segments points={tmpPoints} ref={ref as any} raycast={() => null} {...props} />
+//   }
+
+   return null
 
 }
 
