@@ -1,6 +1,6 @@
 import { Html, Center, useEnvironment, useCursor } from '@react-three/drei'
-import { Suspense, useState, useMemo, useEffect } from 'react'
-import { LoadingManager, Mesh, Raycaster, Vector2 } from 'three'
+import { Suspense, useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { LoadingManager, Mesh, Raycaster, Texture, TextureLoader, Vector2, Vector3 } from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { useLoader, useThree } from '@react-three/fiber'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
@@ -20,12 +20,11 @@ export const useLoadingStore = create<Record<string, LoadState>>(() => ({}))
 // 3D Scene Component - renders inside Canvas
 export default function TestKit()
 {
-
+    const [settings, setSettings] = useState(null)
     const [env, setEnv] = useState<AssetData | null>(null)
     const [texture, setTexture] = useState<AssetData | null>(null)
     const [model, setModel] = useState<AssetData | null>(null)
-    // set managers
-
+ 
     return (
         <>
 
@@ -46,11 +45,11 @@ export default function TestKit()
         }
 
         {/* Textures */}
-         {/* {texture && */}
+         {texture &&
           <Suspense>
             <Tex data={texture}/>
           </Suspense>
-         {/* } */}
+          }
 
           {/* Ui */}
             <Html>
@@ -88,114 +87,134 @@ function Env({ data }: { data: AssetData }) {
   return null; 
 }
 
-function Tex({data}: {data: AssetData}) {
+const texLoader = new TextureLoader()
 
-  const { camera, scene } = useThree()
-  const [pointer, setPointer] = useState<Vector2>()
-  const [selected, setSelected] = useState<Mesh | null>(null)
-  const [isHovering, setIsHovering] = useState<boolean>(false)
+function Tex({ data }: { data: AssetData }) {
 
-  //   /** Custom logic
-  //    * Pick mesh' in the scene and allow them to be clicked / selected
-  //    * When selected it should be possible to add textures to that element
-  //    * When selected it gets outlined (the mesh)
-  //    * New mesh' added to the scene should have this affect too
-  //    */ 
 
-  //   // Set up a raytracer
-  //   // Set eventListener that changes to cursor pointer whenever a mesh is selected
+  const manager = useManager(data.id)
+
+  const textureUrls = useMemo(() => ({
+    Diffuse: data.files?.Diffuse?.["1k"]?.png?.url,
+    Arm: data.files?.arm?.["1k"]?.png?.url,
+    NorGL: data.files?.["nor_gl"]?.["1k"]?.png?.url,
+    Displacement: data.files?.Displacement?.["1k"]?.png?.url,
+    AO: data.files?.AO?.["1k"]?.png?.url,
+    Rough: data.files?.Rough?.["1k"]?.png?.url,
+  }), [data])
+
+  const texs = useLoader(texLoader, Object.values(textureUrls), loader => { if (manager) loader.manager = manager }) //prettier-ignore (use custom loader)
+
+  const texMap = useMemo(() => {
+    const keys = Object.keys(textureUrls)
+    return keys.reduce<Record<string, Texture | null>>((acc, k, i) => {
+      acc[k] = texs[i] || null
+      return acc
+    }, {})
+  }, [texs, textureUrls])
+
+  const { camera, scene, gl } = useThree()
+  const canvas = gl.domElement
+
+  const hovered = useRef<Mesh | null>(null)
+  const selected = useRef<Mesh | null>(null)
+  const originalScale = useRef<Vector3 | null>(null)
+
+  const raycaster = useMemo(() => new Raycaster(), [])
+  const pointer = useMemo(() => new Vector2(), [])
+
   useEffect(() => {
-    const raycaster = new Raycaster()
+    const onMove = (e: PointerEvent) => {
+      pointer.set(
+        (e.clientX / window.innerWidth) * 2 - 1,
+        -(e.clientY / window.innerHeight) * 2 + 1
+      )
 
-    function onPointerMove(e: PointerEvent) {
-      const x = (e.clientX / window.innerWidth) * 2 - 1
-      const y = -(e.clientY / window.innerHeight) * 2 + 1
-      const newPointer = new Vector2(x, y)
-      setPointer(newPointer)
+      raycaster.setFromCamera(pointer, camera)
 
-      raycaster.setFromCamera(newPointer, camera)
+      const hit = raycaster
+        .intersectObjects(scene.children, true)
+        .find(i => (i.object as any).isMesh)?.object as Mesh | undefined
 
-      // Optional: detect intersections immediately
-      const intersects = raycaster.intersectObjects(scene.children, true)
-      
-      
-      // Hit
-      if (intersects.length > 0) 
-      {
-        if (intersects[0].object && intersects[0].object?.isMesh)
-          {
-            setSelected(intersects[0]?.object)
-            setIsHovering(true)
-            console.log(intersects[0].object)
-          }
+      // restore previous
+      if (hovered.current && hovered.current !== hit && originalScale.current) {
+        hovered.current.scale.copy(originalScale.current)
+        originalScale.current = null
       }
-      // No hit
-      else 
-      {
-        setIsHovering(false)
+
+      if (!hit) {
+        hovered.current = null
+        document.body.style.cursor = "auto"
+        return
+      }
+
+      document.body.style.cursor = "pointer"
+
+      if (hovered.current !== hit) {
+        originalScale.current = hit.scale.clone()
+        hovered.current = hit
+        hit.scale.setScalar(1.1)
       }
     }
 
-
-    function onPointerDown(e: PointerEvent) {
-      if (!isHovering) return 
-      // set it as selected
-
-      // setSelected()
+    const onDown = () => {
+      if (!hovered.current) return
+      selected.current = hovered.current
+      console.log("selected:", selected.current.name)
     }
 
-    // listener
-    window.addEventListener('pointermove', onPointerMove)
-    return () => window.removeEventListener('pointermove', onPointerMove)
-    
-  }, [camera, scene])
+    canvas.addEventListener("pointermove", onMove)
+    canvas.addEventListener("pointerdown", onDown)
 
-  // hover effect
+    return () => {
+      canvas.removeEventListener("pointermove", onMove)
+      canvas.removeEventListener("pointerdown", onDown)
+    }
+  }, [camera, scene, raycaster, canvas])
+
   useEffect(() => {
-    if (isHovering) document.body.style.cursor = "pointer"
-    if (!isHovering) document.body.style.cursor = "auto"
-  }, [isHovering])
+    const mesh = selected.current
+    if (!mesh) return
 
-  // Set edges to indicate its selected
-// export const Edges: ForwardRefComponent<EdgesProps, EdgesRef> = /* @__PURE__ */ React.forwardRef<EdgesRef, EdgesProps>(
-//   ({ threshold = 15, geometry: explicitGeometry, ...props }: EdgesProps, fref) => {
-//     const ref = React.useRef<LineSegments2>(null!)
-//     React.useImperativeHandle(fref, () => ref.current, [])
+    const apply = (mat: any) => {
+      if (texMap.Diffuse) mat.map = texMap.Diffuse
+      if (texMap.NorGL) mat.normalMap = texMap.NorGL
+      if (texMap.Rough) mat.roughnessMap = texMap.Rough
+      if (texMap.Arm) mat.metalnessMap = texMap.Arm
+      if (texMap.AO) mat.aoMap = texMap.AO
+      // if (texMap.Displacement) {
+      //   mat.displacementMap = texMap.Displacement
+      //   mat.displacementScale = 0.1
+      // }
+      mat.needsUpdate = true
+    }
 
-//     const tmpPoints = React.useMemo(() => [0, 0, 0, 1, 0, 0], [])
-//     const memoizedGeometry = React.useRef<THREE.BufferGeometry>(null)
-//     const memoizedThreshold = React.useRef<number>(null)
+    Array.isArray(mesh.material)
+      ? mesh.material.forEach(apply)
+      : apply(mesh.material)
+  }, [texMap])
 
-//     React.useLayoutEffect(() => {
-//       const parent = ref.current.parent as THREE.Mesh
-//       const geometry = explicitGeometry ?? parent?.geometry
-//       if (!geometry) return
-
-//       const cached = memoizedGeometry.current === geometry && memoizedThreshold.current === threshold
-//       if (cached) return
-//       memoizedGeometry.current = geometry
-//       memoizedThreshold.current = threshold
-
-//       const points = (new THREE.EdgesGeometry(geometry, threshold).attributes.position as THREE.BufferAttribute)
-//         .array as Float32Array
-//       ref.current.geometry.setPositions(points)
-//       ref.current.geometry.attributes.instanceStart.needsUpdate = true
-//       ref.current.geometry.attributes.instanceEnd.needsUpdate = true
-//       ref.current.computeLineDistances()
-//     })
-
-//     return <Line segments points={tmpPoints} ref={ref as any} raycast={() => null} {...props} />
-//   }
-
-   return null
-
+  // debug sphere — does NOT steal raycasts
+  return (
+    <mesh position={[3, 0, 0]} raycast={() => null}>
+      <sphereGeometry args={[1, 32, 32]} />
+      <meshStandardMaterial
+        map={texMap.Diffuse}
+        normalMap={texMap.NorGL}
+        normalScale={2}
+        roughnessMap={texMap.Rough}
+        metalnessMap={texMap.Arm}
+        // displacementMap={texMap.Displacement}
+        // displacementScale={0.1}
+      />
+    </mesh>
+  ) 
 }
 
 function useManager(id: string, includes: null | any = null) 
 {
 
    // add to cache with a unique key for testing purposes
-
    // 
 
   const manager = useMemo(() => {
@@ -205,6 +224,7 @@ function useManager(id: string, includes: null | any = null)
     // Start
     manager.onStart = () => 
     {
+
       useLoadingStore.setState((state) => ({ [id]: { ...state[id], manager: manager, active: true }}))
     }
 
@@ -217,12 +237,14 @@ function useManager(id: string, includes: null | any = null)
 
     manager.onLoad = () => 
     {
+
         useLoadingStore.setState((state) => ({ [id]: { ...state[id], active: false, }}))
     }
 
     manager.onError = () => 
     {
-        useLoadingStore.setState((state) => ({ [id]: { ...state[id], active: false, errors: [state.errors]}}))
+      
+      useLoadingStore.setState((state) => ({ [id]: { ...state[id], active: false, errors: [state.errors]}}))
     }
 
   // Extension to remap url ressources 
