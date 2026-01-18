@@ -1,20 +1,16 @@
 # three-test-kit
 
-A 3D testing playground built with Three.js, and R3F. Load models, environments, and textures with live preview and interactive selection.
+An asset helper tool inspired by blenderkit, created to improve workflow when finding assets like models, textures, hdris. Instead of having to manually upload and test individual assets to your scene, you can surf directly through polyhavens assets using their public API. 
+
+Made with react three fiber.
 
 ## What it does
 
 - Load glTF models with automatic resource remapping
 - Apply HDRI environments to your scene
 - Apply PBR textures (diffuse, normal, roughness, metalness, AO) to selected meshes
-- Orbit controls for navigation
-- Real-time loading progress tracking
 - Click to select and apply textures to individual objects
 
-
-## What you need
-
-The toolkit expects asset data in a specific format with file URLs for models, environments, and textures. Check the Ui component to see how assets are structured.
 
 ![demo](demo.gif)
 
