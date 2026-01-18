@@ -1,6 +1,6 @@
 # three-test-kit
 
-A 3D testing playground built with React, Three.js, and Fiber. Load models, environments, and textures with live preview and interactive selection.
+A 3D testing playground built with Three.js, and R3F. Load models, environments, and textures with live preview and interactive selection.
 
 ## What it does
 
@@ -11,23 +11,11 @@ A 3D testing playground built with React, Three.js, and Fiber. Load models, envi
 - Real-time loading progress tracking
 - Click to select and apply textures to individual objects
 
-## Getting started
-
-```bash
-npm install
-npm run dev
-```
-
-Then open `http://localhost:5173` in your browser.
-
-## Build
-
-```bash
-npm run build
-```
 
 ## What you need
 
 The toolkit expects asset data in a specific format with file URLs for models, environments, and textures. Check the Ui component to see how assets are structured.
 
 ![demo](demo.gif)
+
+[demo](https://three-test-kit.pages.dev/)
