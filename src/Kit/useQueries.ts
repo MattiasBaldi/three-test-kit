@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import api, { ASSET_TYPES, type AssetType } from './api';
 import { useQuery } from '@tanstack/react-query';
 

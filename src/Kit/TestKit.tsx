@@ -1,6 +1,6 @@
-import { Html, Center, useEnvironment, useCursor } from '@react-three/drei'
-import { Suspense, useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { LoadingManager, Mesh, Raycaster, Texture, TextureLoader, Vector2, Vector3 } from 'three'
+import { Html, Center, useEnvironment } from '@react-three/drei'
+import { Suspense, useState, useMemo, useEffect, useRef } from 'react'
+import { LoadingManager, Mesh, Raycaster, Texture, TextureLoader, Vector2, Vector3, Material } from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { useLoader, useThree } from '@react-three/fiber'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
@@ -15,12 +15,27 @@ interface LoadState {
   progress: number
 }
 
+// Store for loading state - needs to be separate to avoid React fast refresh issues
+// eslint-disable-next-line react-refresh/only-export-components
 export const useLoadingStore = create<Record<string, LoadState>>(() => ({}))
+
+// Utility function to set material texture properties
+function applyTexturesToMaterial(
+  mat: Material,
+  texMap: Record<string, Texture | null>
+): void {
+  const matRecord = mat as unknown as Record<string, unknown>
+  if (texMap.Diffuse) matRecord.map = texMap.Diffuse
+  if (texMap.NorGL) matRecord.normalMap = texMap.NorGL
+  if (texMap.Rough) matRecord.roughnessMap = texMap.Rough
+  if (texMap.Arm) matRecord.metalnessMap = texMap.Arm
+  if (texMap.AO) matRecord.aoMap = texMap.AO
+  mat.needsUpdate = true
+}
 
 // 3D Scene Component - renders inside Canvas
 export default function TestKit()
 {
-    const [settings, setSettings] = useState(null)
     const [env, setEnv] = useState<AssetData | null>(null)
     const [texture, setTexture] = useState<AssetData | null>(null)
     const [model, setModel] = useState<AssetData | null>(null)
@@ -134,7 +149,7 @@ function Tex({ data }: { data: AssetData }) {
 
       const hit = raycaster
         .intersectObjects(scene.children, true)
-        .find(i => (i.object as any).isMesh)?.object as Mesh | undefined
+        .find(i => (i.object as unknown as { isMesh: boolean }).isMesh)?.object as Mesh | undefined
 
       // restore previous
       if (hovered.current && hovered.current !== hit && originalScale.current) {
@@ -170,28 +185,17 @@ function Tex({ data }: { data: AssetData }) {
       canvas.removeEventListener("pointermove", onMove)
       canvas.removeEventListener("pointerdown", onDown)
     }
-  }, [camera, scene, raycaster, canvas])
+  }, [camera, scene, raycaster, canvas, pointer])
 
   useEffect(() => {
     const mesh = selected.current
     if (!mesh) return
 
-    const apply = (mat: any) => {
-      if (texMap.Diffuse) mat.map = texMap.Diffuse
-      if (texMap.NorGL) mat.normalMap = texMap.NorGL
-      if (texMap.Rough) mat.roughnessMap = texMap.Rough
-      if (texMap.Arm) mat.metalnessMap = texMap.Arm
-      if (texMap.AO) mat.aoMap = texMap.AO
-      // if (texMap.Displacement) {
-      //   mat.displacementMap = texMap.Displacement
-      //   mat.displacementScale = 0.1
-      // }
-      mat.needsUpdate = true
+    if (Array.isArray(mesh.material)) {
+      mesh.material.forEach(mat => applyTexturesToMaterial(mat, texMap))
+    } else {
+      applyTexturesToMaterial(mesh.material, texMap)
     }
-
-    Array.isArray(mesh.material)
-      ? mesh.material.forEach(apply)
-      : apply(mesh.material)
   }, [texMap])
 
   // debug sphere — does NOT steal raycasts
@@ -211,11 +215,11 @@ function Tex({ data }: { data: AssetData }) {
   ) 
 }
 
-function useManager(id: string, includes: null | any = null) 
+function useManager(id: string, includes: Record<string, unknown> | null = null)
 {
 
    // add to cache with a unique key for testing purposes
-   // 
+   //
 
   const manager = useMemo(() => {
 
@@ -265,7 +269,7 @@ function useManager(id: string, includes: null | any = null)
 
 
     return manager
-  }, [id])
+  }, [id, includes])
 
   return manager 
 }

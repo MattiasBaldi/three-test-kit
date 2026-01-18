@@ -36,7 +36,7 @@ export interface AssetMetadata {
   categories: string[];
   tags: string[];
   authors: { [authorId: string]: string };
-  [key: string]: any; // Additional metadata fields
+  [key: string]: unknown; // Additional metadata fields
 }
 
 export interface AssetsResponse {
@@ -244,7 +244,9 @@ export class PolyhavenAPI {
    * @param typeNum - Asset type number (0: hdri, 1: texture, 2: model)
    */
   async loadAsset(id: string, typeNum: number) {
-    let url, type, includes;
+    let url: string | undefined;
+    let type: string | undefined;
+    let includes: unknown;
     const r = await this.getFiles(id);
 
     console.log({r})
@@ -253,20 +255,27 @@ export class PolyhavenAPI {
       case 0:
         // load hdri
         type = "hdri"
-        url = r?.hdri?.["1k"]?.hdr?.url;
+        if ('hdri' in r) {
+          url = (r.hdri as Record<string, Record<string, FileInfo>>)["1k"]?.["hdr"]?.url;
+        }
         break;
 
       case 1:
         // load textures
         type = "texture"
-        url = r?.diffuse?.["1k"]?.jpg?.url;
+        if ('Diffuse' in r) {
+          url = (r.Diffuse as Record<string, Record<string, FileInfo>>)["1k"]?.["jpg"]?.url;
+        }
         break;
 
       case 2:
         // load model
         type = "model"
-        url = r?.gltf?.["1k"]?.gltf?.url;
-        includes = r?.gltf?.["1k"]?.gltf?.include;
+        if ('gltf' in r) {
+          const gltfData = (r.gltf as Record<string, Record<string, unknown>>)["1k"];
+          url = (gltfData?.gltf as FileInfo)?.url;
+          includes = (gltfData?.gltf as Record<string, unknown>)?.include;
+        }
         break;
 
       default:
@@ -316,7 +325,8 @@ export async function example3_DownloadHDRI(assetId: string) {
 
   // Access the 4K EXR file (if it's an HDRI)
   if ('hdri' in files) {
-    const file4k = files.hdri['4k']?.['exr'];
+    const hdriData = files.hdri as Record<string, Record<string, FileInfo>>
+    const file4k = hdriData['4k']?.['exr'];
     if (file4k) {
       console.log(`Download URL: ${file4k.url}`);
       console.log(`File size: ${file4k.size} bytes`);
@@ -354,8 +364,8 @@ export async function example5_SearchByTag(searchTag: string) {
   const allAssets = await api.getAssets();
 
   const matches = Object.entries(allAssets)
-    .filter(([_, metadata]) => metadata.tags.includes(searchTag))
-    .map(([id, metadata]) => ({ id, ...metadata }));
+    .filter(([, metadata]) => metadata.tags.includes(searchTag))
+    .map(([id, metadata]) => ({ id, name: metadata.name, categories: metadata.categories, tags: metadata.tags, authors: metadata.authors }));
 
   return matches;
 }
