@@ -4,14 +4,5 @@ An asset helper tool inspired by blenderkit, created to improve workflow when fi
 
 Made with react three fiber.
 
-## What it does
-
-- Load glTF models with automatic resource remapping
-- Apply HDRI environments to your scene
-- Apply PBR textures (diffuse, normal, roughness, metalness, AO) to selected meshes
-- Click to select and apply textures to individual objects
-
-
 ![demo](demo.gif)
-
 [demo](https://three-test-kit.pages.dev/)
